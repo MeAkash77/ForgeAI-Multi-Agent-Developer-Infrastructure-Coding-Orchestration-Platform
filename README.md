@@ -970,7 +970,7 @@ xychart-beta
 ## Development
 
 ```bash
-git clone https://github.com/hoangsonww/Forge-Agentic-Coding-CLI && cd forge
+git clone https://github.com/MeAkash77/ForgeAI-Multi-Agent-Developer-Infrastructure-Coding-Orchestration-Platform.git && cd forge
 npm install
 npm run build             # tsc + copy-assets
 npm test                  # 548 tests across 97 files; all must pass
@@ -1026,6 +1026,6 @@ MIT. See [LICENSE](LICENSE) for more details.
 ---
 
 <div align="center" style="margin-top: 2em">
-<p>Son Nguyen · <a href="https://sonnguyenhoang.com">sonnguyenhoang.com</a> · <a href="https://github.com/hoangsonww">github.com/hoangsonww</a></p>
+<p>Son Nguyen · <a href="https://github.com/MeAkash77">Akash</a> · <a href="https://github.com/MeAkash77">github.com/MeAkash77</a></p>
 <p>Thank you for checking out Forge! If you have any questions, feedback, or want to contribute, please open an issue or a pull request.</p>
 </div>
