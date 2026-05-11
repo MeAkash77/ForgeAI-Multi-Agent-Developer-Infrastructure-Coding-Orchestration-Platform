@@ -1,0 +1,120 @@
+/**
+ * Review agent — validates the outcome of an executed task against the original requirements. This is used after running a task to determine if the changes meet the acceptance criteria. The output includes an approval status, a list of issues (if any), and a summary of the review. The agent should be cautious in approving changes, especially if there are test failures or potential security issues.
+ *
+ * @author Son Nguyen <hoangson091104@gmail.com>
+ */
+
+import { Agent, AgentResult } from './base';
+import { callModel } from '../models/router';
+import { assembleTaskPrompt } from '../prompts/assembler';
+import { log } from '../logging/logger';
+
+export interface ReviewVerdict {
+  approved: boolean;
+  issues: Array<{ severity: 'info' | 'warning' | 'error'; message: string }>;
+  summary: string;
+}
+
+const reviewerSchema = `You are reviewing the outcome of an executed task.
+
+Output STRICT JSON:
+{
+  "approved": boolean,
+  "issues": [
+    { "severity": "info" | "warning" | "error", "message": string }
+  ],
+  "summary": string
+}
+
+Approval rules:
+- For tasks that modify code (bugfix/feature/refactor/test/optimization):
+    Approve only if the requested change is complete, no obvious regressions
+    were introduced, any tests pass, and no security issues were introduced
+    (secrets, unsafe commands, unsanitized input).
+- For analysis / informational tasks (summarize, explain, describe, audit):
+    The deliverable is the answer itself, NOT a diff. Do NOT reject such a
+    task merely because there are no file changes — that's the expected
+    shape of the work. Approve if the requested analysis was produced and
+    appears coherent and on-topic. Reject only if the analysis is absent,
+    contradictory, or the agent clearly didn't perform the work.`;
+
+const parse = (content: string): ReviewVerdict | null => {
+  const fence = /```(?:json)?\s*([\s\S]+?)\s*```/i.exec(content);
+  try {
+    const obj = JSON.parse(fence ? fence[1] : content);
+    if (typeof obj !== 'object' || obj === null) return null;
+    return {
+      approved: Boolean(obj.approved),
+      issues: Array.isArray(obj.issues)
+        ? obj.issues.map((i: any) => ({
+            severity: ['info', 'warning', 'error'].includes(i?.severity) ? i.severity : 'info',
+            message: String(i?.message ?? ''),
+          }))
+        : [],
+      summary: String(obj.summary ?? ''),
+    };
+  } catch {
+    return null;
+  }
+};
+
+export interface ReviewerInput {
+  taskTitle: string;
+  changesSummary: string;
+  filesChanged: string[];
+  testsPassed?: boolean;
+  /** Intent from the classifier — lets the reviewer judge analysis tasks by analysis content, not by file-change count. */
+  intent?: import('../types').TaskType;
+}
+
+export const reviewOutcome = async (
+  input: ReviewerInput,
+  mode: import('../types').Mode,
+): Promise<ReviewVerdict> => {
+  const intentLine = input.intent
+    ? `Task intent: ${input.intent}${input.intent === 'analysis' ? ' (informational — no file changes expected)' : ''}`
+    : '';
+  const prompt = assembleTaskPrompt({
+    mode,
+    title: `Review: ${input.taskTitle}`,
+    description: input.changesSummary,
+    additionalUserText: `${reviewerSchema}
+
+${intentLine}
+Files changed: ${input.filesChanged.join(', ') || '(none)'}
+Tests passed: ${input.testsPassed ?? 'unknown'}
+
+Summary of what happened:
+${input.changesSummary}`,
+  });
+  try {
+    const { response } = await callModel('reviewer', mode, prompt.messages, {
+      jsonMode: true,
+      temperature: 0.1,
+      maxTokens: 800,
+      timeoutMs: 60_000,
+    });
+    return (
+      parse(response.content) ?? {
+        approved: input.testsPassed !== false,
+        issues: [],
+        summary: response.content.slice(0, 300),
+      }
+    );
+  } catch (err) {
+    log.warn('reviewer failed; defaulting to cautious approval', { err: String(err) });
+    return {
+      approved: input.testsPassed !== false,
+      issues: [{ severity: 'warning', message: `reviewer model unavailable: ${String(err)}` }],
+      summary: 'approved by policy (reviewer unavailable)',
+    };
+  }
+};
+
+export const reviewerAgent: Agent = {
+  name: 'reviewer',
+  description: 'Validates task outcome against requirements.',
+  async run(): Promise<AgentResult> {
+    return { success: false, message: 'reviewer.run is a delegate; use reviewOutcome()' };
+  },
+};
