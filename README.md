@@ -1026,6 +1026,6 @@ MIT. See [LICENSE](LICENSE) for more details.
 ---
 
 <div align="center" style="margin-top: 2em">
-<p>Son Nguyen · <a href="https://github.com/MeAkash77">Akash</a> · <a href="https://github.com/MeAkash77">github.com/MeAkash77</a></p>
+<p>Akash · <a href="https://github.com/MeAkash77">Akash</a> · <a href="https://github.com/MeAkash77">MeAkash77</a></p>
 <p>Thank you for checking out Forge! If you have any questions, feedback, or want to contribute, please open an issue or a pull request.</p>
 </div>
